@@ -10,7 +10,7 @@ tags:
 
 This example starts up a [FastAPI](https://fastapi.tiangolo.com/) server.
 
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https%3A%2F%2Fgithub.com%2Frailwayapp-starters%2Ffastapi)
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template/h-Mk3g)
 ## ✨ Features
 
 - FastAPI
