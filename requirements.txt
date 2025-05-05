@@ -1,2 +1,14 @@
-fastapi==0.100.0
-hypercorn==0.14.4
+fastapi>=0.68.0
+uvicorn>=0.15.0
+pymongo>=4.1.1
+motor>=3.0.0
+python-dotenv>=0.19.2
+pydantic>=1.9.0
+fastapi
+uvicorn
+pydantic
+python-jose
+passlib[bcrypt]
+python-dotenv
+motor
+email-validator
