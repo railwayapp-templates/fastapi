@@ -11,7 +11,6 @@ MONGO_URI = os.getenv("MONGODB_URI")
 MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "productdb")
 
 # Cliente de MongoDB
-
 client = AsyncIOMotorClient(MONGO_URI)
 database = client[MONGO_DB_NAME]
 
