@@ -1,2 +1,12 @@
-fastapi==0.100.0
-hypercorn==0.14.4
+fastapi==0.104.1
+uvicorn==0.24.0
+numpy<2
+gdown==4.7.1
+opencv-python-headless==4.8.1.78
+Pillow==10.1.0
+torch==2.1.1+cpu
+torchvision==0.16.1+cpu
+--extra-index-url https://download.pytorch.org/whl/cpu
+git+https://github.com/facebookresearch/segment-anything.git
+hypercorn==0.14.3
+wsproto==0.15.0
