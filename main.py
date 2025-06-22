@@ -1,4 +1,7 @@
 from fastapi import FastAPI
+import requests
+from datetime import datetime, timedelta
+from icalendar import Calendar
 
 app = FastAPI()
 
@@ -43,6 +46,7 @@ def datas_indisponiveis():
                         all_dates.update(dates)
         except Exception as e:
             print(f"Erro ao processar {plataforma}: {e}")
+            return {"error": f"Erro ao processar {plataforma}: {e}"}
 
     sorted_dates = sorted(list(all_dates), key=lambda d: datetime.strptime(d, "%d/%m/%Y"))
     return {"datas_indisponiveis": sorted_dates}

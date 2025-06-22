@@ -1,0 +1,80 @@
+name: Testes API FastAPI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11"]
+    
+    steps:
+    - name: Checkout código
+      uses: actions/checkout@v4
+    
+    - name: Configurar Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Cache dependências pip
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Instalar dependências
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Executar testes
+      run: |
+        python test_main.py
+    
+    - name: Executar testes com pytest
+      run: |
+        pytest test_main.py -v --tb=short
+    
+    - name: Testar inicialização da API
+      run: |
+        # Testa se a API pode ser importada sem erros
+        python -c "from main import app; print('✅ API importada com sucesso!')"
+    
+    - name: Verificar sintaxe do código
+      run: |
+        python -m py_compile main.py
+        python -m py_compile test_main.py
+        echo "✅ Sintaxe do código verificada!"
+
+  lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout código
+      uses: actions/checkout@v4
+    
+    - name: Configurar Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+    
+    - name: Instalar flake8
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8
+    
+    - name: Executar linting
+      run: |
+        # Para de executar em caso de erros de syntax, E9, F63, F7, F82
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # Para outros avisos, apenas reporta
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics 
