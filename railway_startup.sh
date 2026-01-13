@@ -38,11 +38,11 @@ if [ -n "$TAILSCALE_AUTH_KEY" ]; then
 	
 	echo "Tailscale: Authenticating..."
 	# 6. Connect to your tailnet
-	./tailscale up --authkey="${TS_AUTHKEY}" --hostname="railway-app"
+	./tailscale up --authkey="${TAILSCALE_AUTH_KEY}" --hostname="railway-app"
 	
 	echo "Tailscale is online."
 else
-	echo "WARNING: TS_AUTHKEY not set. Skipping Tailscale setup."
+	echo "WARNING: TAILSCALE_AUTH_KEY not set. Skipping Tailscale setup."
 fi
 # --- TAILSCALE SETUP END ---
 
