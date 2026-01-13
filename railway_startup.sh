@@ -8,13 +8,28 @@ echo "=========================================="
 echo "Starting QuantAgentic API services..."
 echo "=========================================="
 
+ENV_NAME_LOWER="${RAILWAY_ENVIRONMENT_NAME,,}"
+
+# Check if "pr-" is IN the name (start, middle, or end)
+# The stars (*) mean "match any characters here"
+if [[ "$ENV_NAME_LOWER" == *"pr-"* ]]; then
+	echo "NOTICE: PR Environment detected ($RAILWAY_ENVIRONMENT_NAME)"
+	export IS_PR_ENV="true"
+	HOSTNAME="${RAILWAY_ENVIRONMENT_NAME}"
+else
+	echo "NOTICE: Production/Standard Environment detected ($RAILWAY_ENVIRONMENT_NAME)"
+	export IS_PR_ENV="false"
+	HOSTNAME="${RAILWAY_ENVIRONMENT_NAME}"
+fi
+
+
 # --- TAILSCALE "NO-DOCKERFILE" SETUP START ---
 if [ -n "$TAILSCALE_AUTH_KEY" ]; then
 	echo "Tailscale: Installing standalone binaries..."
 	
 	# 1. Download and extract the static binaries (prevents package manager errors)
 	# We use a static version to ensure stability. You can update the version number if needed.
-	TS_VERSION="1.70.0"
+	TS_VERSION="1.92.5"
 	curl -fsSL "https://pkgs.tailscale.com/stable/tailscale_${TS_VERSION}_amd64.tgz" -o tailscale.tgz
 	tar xzf tailscale.tgz
 	
@@ -38,7 +53,7 @@ if [ -n "$TAILSCALE_AUTH_KEY" ]; then
 	
 	echo "Tailscale: Authenticating..."
 	# 6. Connect to your tailnet
-	./tailscale up --authkey="${TAILSCALE_AUTH_KEY}" --hostname="railway-app"
+	./tailscale up --authkey="${TAILSCALE_AUTH_KEY}" --hostname="${HOSTNAME}"
 	
 	echo "Tailscale is online."
 else
