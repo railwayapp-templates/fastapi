@@ -10,49 +10,44 @@ echo "=========================================="
 
 ENV_NAME_LOWER="${RAILWAY_ENVIRONMENT_NAME,,}"
 
+# SANITIZE HOSTNAME: Replace underscores (_) with hyphens (-) for DNS compatibility
+# Tailscale will fail if the hostname contains underscores.
+SAFE_HOSTNAME="${ENV_NAME_LOWER//_/-}"
+
 # Check if "pr-" is IN the name (start, middle, or end)
-# The stars (*) mean "match any characters here"
 if [[ "$ENV_NAME_LOWER" == *"pr-"* ]]; then
 	echo "NOTICE: PR Environment detected ($RAILWAY_ENVIRONMENT_NAME)"
 	export IS_PR_ENV="true"
-	HOSTNAME="${RAILWAY_ENVIRONMENT_NAME}"
+	HOSTNAME="$SAFE_HOSTNAME"
 else
 	echo "NOTICE: Production/Standard Environment detected ($RAILWAY_ENVIRONMENT_NAME)"
 	export IS_PR_ENV="false"
-	HOSTNAME="${RAILWAY_ENVIRONMENT_NAME}"
+	HOSTNAME="$SAFE_HOSTNAME"
 fi
-
 
 # --- TAILSCALE "NO-DOCKERFILE" SETUP START ---
 if [ -n "$TAILSCALE_AUTH_KEY" ]; then
 	echo "Tailscale: Installing standalone binaries..."
 	
-	# 1. Download and extract the static binaries (prevents package manager errors)
-	# We use a static version to ensure stability. You can update the version number if needed.
 	TS_VERSION="1.92.5"
 	curl -fsSL "https://pkgs.tailscale.com/stable/tailscale_${TS_VERSION}_amd64.tgz" -o tailscale.tgz
 	tar xzf tailscale.tgz
 	
-	# 2. Move binaries to a location in your path (or use them directly)
-	# We move them to the current directory for simplicity and add to path
 	mv "tailscale_${TS_VERSION}_amd64"/tailscale .
 	mv "tailscale_${TS_VERSION}_amd64"/tailscaled .
 	chmod +x tailscale tailscaled
 	export PATH=$PATH:$(pwd)
 
-	# 3. Create the state directory (crucial for "tun" mode)
 	mkdir -p /var/run/tailscale
 	mkdir -p /var/lib/tailscale
 
 	echo "Tailscale: Starting daemon..."
-	# 4. Start the daemon in userspace mode
 	./tailscaled --tun=userspace-networking --socket=/var/run/tailscale/tailscaled.sock --state=/var/lib/tailscale/tailscaled.state &
 	
-	# 5. Wait for daemon to initialize
 	sleep 3
 	
 	echo "Tailscale: Authenticating..."
-	# 6. Connect to your tailnet
+	# Connect using the sanitized SAFE_HOSTNAME
 	./tailscale up --authkey="${TAILSCALE_AUTH_KEY}" --hostname="${HOSTNAME}"
 	
 	echo "Tailscale is online."
@@ -76,24 +71,19 @@ fi
 
 echo "=========================================="
 
-# Start Celery worker with beat in the background
 echo "Starting Celery worker with beat scheduler..."
 celery -A app.celery_app worker --beat --loglevel=info --logfile=/dev/stdout &
 CELERY_PID=$!
 
-# Function to cleanup on exit
 cleanup() {
 	echo "Shutting down services..."
 	kill $CELERY_PID 2>/dev/null || true
-	# Kill tailscaled if we started it
 	pkill tailscaled || true
 	exit
 }
 
-# Set trap to cleanup on script exit
 trap cleanup SIGTERM SIGINT EXIT
 
-# Wait a moment for Celery to start
 sleep 3
 
 if ! kill -0 $CELERY_PID 2>/dev/null; then
