@@ -36,6 +36,8 @@ class Event(BaseSchema):
 	is_active: bool = True
 	# Whether or not we have proof that the event actually occurred.
 	confirmed: bool = False
+	# Whether or not the event has been processed by the ETL job.
+	etl_processed: bool = False
 	# The raw VTEC string from the NWS API.
 	raw_vtec: str
 	# The NWS office code (e.g., "KSBY", "KMTR") extracted from raw_vtec.

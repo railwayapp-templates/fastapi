@@ -5,7 +5,7 @@ import pytest
 from unittest.mock import Mock, patch
 from datetime import datetime, timezone, timedelta
 from app.services.event_update_service import EventUpdateService
-from app.services.event_crud_service import EventCRUDService
+from app.services.event_read_service import EventReadService
 from app.shared_models.nws_poller_models import FilteredNWSAlert
 from app.schemas.event import Event
 from app.schemas.location import Location, Coordinate
@@ -84,7 +84,7 @@ class TestUpdateEventFromAlert:
 			]
 		)
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_event')
+	@patch('app.services.event_read_service.EventReadService.get_event')
 	@patch('app.services.event_update_service.state')
 	def test_update_event_standard_update(self, mock_state, mock_get_event, existing_event, update_alert):
 		"""Test standard update (CON message type) - merges locations and updates fields."""
@@ -114,7 +114,7 @@ class TestUpdateEventFromAlert:
 		assert existing_event.nws_alert_id in result.previous_ids  # Old ID added
 		mock_state.update_event.assert_called_once_with(result)
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_event')
+	@patch('app.services.event_read_service.EventReadService.get_event')
 	@patch('app.services.event_update_service.state')
 	def test_update_event_cor_message_type(self, mock_state, mock_get_event, existing_event):
 		"""Test COR (Correction) message type - replaces entire event."""
@@ -169,7 +169,7 @@ class TestUpdateEventFromAlert:
 		assert result.actual_end_date == existing_event.actual_end_date  # Preserved
 		assert existing_event.nws_alert_id in result.previous_ids
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_event')
+	@patch('app.services.event_read_service.EventReadService.get_event')
 	@patch('app.services.event_update_service.state')
 	def test_update_event_upg_message_type(self, mock_state, mock_get_event, existing_event):
 		"""Test UPG (Update) message type - replaces entire event."""
@@ -219,7 +219,7 @@ class TestUpdateEventFromAlert:
 		assert "Upgraded Tornado Warning" in result.description
 		assert existing_event.nws_alert_id in result.previous_ids
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_event')
+	@patch('app.services.event_read_service.EventReadService.get_event')
 	@patch('app.services.event_update_service.state')
 	def test_update_event_can_message_type(self, mock_state, mock_get_event, existing_event):
 		"""Test CAN (Cancel) message type - returns None as it's handled by check_completed_events."""
@@ -257,7 +257,7 @@ class TestUpdateEventFromAlert:
 		# Should not update event (handled by check_completed_events instead)
 		mock_state.update_event.assert_not_called()
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_event')
+	@patch('app.services.event_read_service.EventReadService.get_event')
 	@patch('app.services.event_update_service.state')
 	def test_update_event_exp_message_type(self, mock_state, mock_get_event, existing_event):
 		"""Test EXP (Expired) message type - returns None as it's handled by check_completed_events."""
@@ -295,7 +295,7 @@ class TestUpdateEventFromAlert:
 		# Should not update event (handled by check_completed_events instead)
 		mock_state.update_event.assert_not_called()
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_event')
+	@patch('app.services.event_read_service.EventReadService.get_event')
 	@patch('app.services.event_update_service.state')
 	def test_update_event_merges_locations(self, mock_state, mock_get_event, existing_event):
 		"""Test that standard update merges locations without duplicates."""
@@ -345,7 +345,7 @@ class TestUpdateEventFromAlert:
 		assert "TXC113" in ugc_codes
 		assert "TXC215" in ugc_codes
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_event')
+	@patch('app.services.event_read_service.EventReadService.get_event')
 	@patch('app.services.event_update_service.state')
 	def test_update_event_no_duplicate_locations(self, mock_state, mock_get_event, existing_event):
 		"""Test that duplicate locations (same ugc_code) are not added."""
@@ -393,7 +393,7 @@ class TestUpdateEventFromAlert:
 		assert len(result.locations) == 1  # No duplicate added
 		assert result.locations[0].ugc_code == "TXC113"
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_event')
+	@patch('app.services.event_read_service.EventReadService.get_event')
 	@patch('app.services.event_update_service.state')
 	def test_update_event_not_found_error(self, mock_state, mock_get_event, update_alert):
 		"""Test that NotFoundError is raised when event doesn't exist."""
@@ -405,7 +405,7 @@ class TestUpdateEventFromAlert:
 		with pytest.raises(NotFoundError):
 			EventUpdateService.update_event_from_alert(update_alert)
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_event')
+	@patch('app.services.event_read_service.EventReadService.get_event')
 	@patch('app.services.event_update_service.state')
 	def test_update_event_tracks_previous_ids(self, mock_state, mock_get_event, existing_event, update_alert):
 		"""Test that previous alert IDs are tracked correctly."""
@@ -423,7 +423,7 @@ class TestUpdateEventFromAlert:
 		assert "old-alert-2" in result.previous_ids
 		assert existing_event.nws_alert_id in result.previous_ids
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_event')
+	@patch('app.services.event_read_service.EventReadService.get_event')
 	@patch('app.services.event_update_service.state')
 	def test_update_event_no_duplicate_previous_id(self, mock_state, mock_get_event, existing_event):
 		"""Test that current alert ID is not added to previous_ids if already there."""
@@ -460,7 +460,7 @@ class TestUpdateEventFromAlert:
 		# Assertions - should only have one instance of the old alert ID
 		assert result.previous_ids.count(existing_event.nws_alert_id) == 1
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_event')
+	@patch('app.services.event_read_service.EventReadService.get_event')
 	@patch('app.services.event_update_service.state')
 	def test_update_event_case_insensitive_message_type(self, mock_state, mock_get_event, existing_event):
 		"""Test that message type comparison is case-insensitive."""
@@ -497,7 +497,7 @@ class TestUpdateEventFromAlert:
 		# Assertions - CAN/EXP are now handled by check_completed_events, so this returns None
 		assert result is None
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_event')
+	@patch('app.services.event_read_service.EventReadService.get_event')
 	@patch('app.services.event_update_service.state')
 	def test_update_event_with_missing_expected_end(self, mock_state, mock_get_event, existing_event):
 		"""Test update when expected_end is None."""
@@ -543,7 +543,7 @@ class TestUpdateEventFromAlert:
 class TestConfirmedFunctionality:
 	"""Test cases for confirmed field functionality in event updates."""
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_event')
+	@patch('app.services.event_read_service.EventReadService.get_event')
 	@patch('app.services.event_update_service.state')
 	def test_update_event_with_observed_certainty_sets_confirmed_true(self, mock_state, mock_get_event):
 		"""Test that updating an event with certainty='Observed' sets confirmed=True."""
@@ -587,7 +587,7 @@ class TestConfirmedFunctionality:
 		
 		assert result.confirmed is True
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_event')
+	@patch('app.services.event_read_service.EventReadService.get_event')
 	@patch('app.services.event_update_service.state')
 	def test_update_event_preserves_confirmed_if_already_true(self, mock_state, mock_get_event):
 		"""Test that updating an event preserves confirmed=True if already set."""
@@ -632,7 +632,7 @@ class TestConfirmedFunctionality:
 		# Should preserve confirmed=True even though new alert is not observed
 		assert result.confirmed is True
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_event')
+	@patch('app.services.event_read_service.EventReadService.get_event')
 	@patch('app.services.event_update_service.state')
 	def test_replace_event_with_observed_certainty_sets_confirmed_true(self, mock_state, mock_get_event):
 		"""Test that replacing an event (COR/UPG) with certainty='Observed' sets confirmed=True."""
@@ -675,3 +675,213 @@ class TestConfirmedFunctionality:
 		result = EventUpdateService.update_event_from_alert(cor_alert)
 		
 		assert result.confirmed is True
+
+
+class TestUpdateEvent:
+	"""Test cases for EventUpdateService.update_event (direct Event object update)."""
+	
+	@pytest.fixture
+	def existing_event(self):
+		"""Create an existing event for testing."""
+		return Event(
+			event_key="KFWD.TO.W.0015.2024",
+			nws_alert_id="https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.1234567890",
+			episode_key="EP001",
+			event_type="TOR",
+			hr_event_type="Tornado Warning",
+			locations=[
+				Location(
+					episode_key="EP001",
+					event_key="KFWD.TO.W.0015.2024",
+					state_fips="48",
+					county_fips="113",
+					ugc_code="TXC113",
+					shape=[Coordinate(latitude=32.8, longitude=-97.5)],
+					full_zone_ugc_endpoint="https://api.weather.gov/zones/forecast/TXC113"
+				)
+			],
+			start_date=datetime(2024, 1, 15, 10, 0, 0, tzinfo=timezone.utc),
+			expected_end_date=datetime(2024, 1, 15, 11, 0, 0, tzinfo=timezone.utc),
+			actual_end_date=None,
+			updated_at=datetime(2024, 1, 15, 10, 0, 0, tzinfo=timezone.utc),
+			description="Original description",
+			is_active=True,
+			confirmed=False,
+			etl_processed=False,
+			raw_vtec="/O.NEW.KFWD.TO.W.0015.240115T1000Z-240115T1100Z/",
+			office="KFWD",
+			previous_ids=[],
+			property_damage=1000,
+			crops_damage=500,
+			range_miles=5.0
+		)
+	
+	@patch('app.services.event_read_service.EventReadService.get_event')
+	@patch('app.services.event_update_service.state')
+	def test_update_event_success(self, mock_state, mock_get_event, existing_event):
+		"""Test successful update of an event directly from Event object."""
+		# Setup
+		mock_get_event.return_value = existing_event
+		mock_state.update_event = Mock()
+		
+		# Create updated event
+		updated_event_data = Event(
+			event_key=existing_event.event_key,
+			nws_alert_id=existing_event.nws_alert_id,
+			episode_key=existing_event.episode_key,
+			event_type=existing_event.event_type,
+			hr_event_type="Updated Tornado Warning",
+			locations=existing_event.locations,
+			start_date=existing_event.start_date,
+			expected_end_date=datetime(2024, 1, 15, 12, 0, 0, tzinfo=timezone.utc),
+			actual_end_date=None,
+			updated_at=existing_event.updated_at,  # Will be updated by service
+			description="Updated description",
+			is_active=True,
+			confirmed=True,
+			etl_processed=True,
+			raw_vtec=existing_event.raw_vtec,
+			office=existing_event.office,
+			previous_ids=existing_event.previous_ids,
+			property_damage=2000,
+			crops_damage=1000,
+			range_miles=10.0
+		)
+		
+		# Execute
+		result = EventUpdateService.update_event(updated_event_data)
+		
+		# Assertions
+		assert isinstance(result, Event)
+		assert result.event_key == existing_event.event_key
+		assert result.nws_alert_id == existing_event.nws_alert_id
+		assert result.episode_key == existing_event.episode_key
+		assert result.event_type == existing_event.event_type
+		assert result.hr_event_type == "Updated Tornado Warning"
+		assert result.description == "Updated description"
+		assert result.expected_end_date == datetime(2024, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+		assert result.property_damage == 2000
+		assert result.crops_damage == 1000
+		assert result.range_miles == 10.0
+		assert result.is_active is True
+		assert result.confirmed is True
+		assert result.etl_processed is True
+		# updated_at should be set to current time (not the original)
+		assert result.updated_at != existing_event.updated_at
+		assert result.updated_at >= datetime.now(timezone.utc) - timedelta(seconds=1)
+		mock_state.update_event.assert_called_once()
+		mock_get_event.assert_called_once_with(existing_event.event_key)
+	
+	@patch('app.services.event_read_service.EventReadService.get_event')
+	@patch('app.services.event_update_service.state')
+	def test_update_event_preserves_all_fields(self, mock_state, mock_get_event, existing_event):
+		"""Test that update_event preserves all fields from the provided Event object."""
+		# Setup
+		mock_get_event.return_value = existing_event
+		mock_state.update_event = Mock()
+		
+		# Execute with same event data
+		result = EventUpdateService.update_event(existing_event)
+		
+		# Assertions - all fields should be preserved except updated_at
+		assert result.event_key == existing_event.event_key
+		assert result.nws_alert_id == existing_event.nws_alert_id
+		assert result.episode_key == existing_event.episode_key
+		assert result.event_type == existing_event.event_type
+		assert result.hr_event_type == existing_event.hr_event_type
+		assert result.locations == existing_event.locations
+		assert result.start_date == existing_event.start_date
+		assert result.expected_end_date == existing_event.expected_end_date
+		assert result.actual_end_date == existing_event.actual_end_date
+		assert result.description == existing_event.description
+		assert result.is_active == existing_event.is_active
+		assert result.confirmed == existing_event.confirmed
+		assert result.etl_processed == existing_event.etl_processed
+		assert result.raw_vtec == existing_event.raw_vtec
+		assert result.office == existing_event.office
+		assert result.previous_ids == existing_event.previous_ids
+		assert result.property_damage == existing_event.property_damage
+		assert result.crops_damage == existing_event.crops_damage
+		assert result.range_miles == existing_event.range_miles
+		# Only updated_at should change
+		assert result.updated_at != existing_event.updated_at
+		assert result.updated_at >= datetime.now(timezone.utc) - timedelta(seconds=1)
+	
+	@patch('app.services.event_read_service.EventReadService.get_event')
+	def test_update_event_not_found_error(self, mock_get_event):
+		"""Test that NotFoundError is raised when event doesn't exist."""
+		# Setup
+		from app.exceptions import NotFoundError
+		event_key = "NONEXISTENT.EVENT.KEY"
+		mock_get_event.side_effect = NotFoundError("Event", event_key)
+		
+		# Create event object
+		event = Event(
+			event_key=event_key,
+			nws_alert_id="alert-123",
+			event_type="TOR",
+			start_date=datetime.now(timezone.utc),
+			description="Test event",
+			raw_vtec="/O.NEW.KFWD.TO.W.0015.240115T1000Z-240115T1100Z/"
+		)
+		
+		# Execute & Assert
+		with pytest.raises(NotFoundError):
+			EventUpdateService.update_event(event)
+	
+	@patch('app.services.event_read_service.EventReadService.get_event')
+	@patch('app.services.event_update_service.state')
+	def test_update_event_updates_timestamp(self, mock_state, mock_get_event, existing_event):
+		"""Test that update_event always updates the updated_at timestamp."""
+		# Setup
+		mock_get_event.return_value = existing_event
+		mock_state.update_event = Mock()
+		
+		# Store original updated_at
+		original_updated_at = existing_event.updated_at
+		
+		# Execute
+		result = EventUpdateService.update_event(existing_event)
+		
+		# Assertions
+		assert result.updated_at != original_updated_at
+		assert result.updated_at >= datetime.now(timezone.utc) - timedelta(seconds=1)
+		assert result.updated_at <= datetime.now(timezone.utc) + timedelta(seconds=1)
+	
+	@patch('app.services.event_read_service.EventReadService.get_event')
+	@patch('app.services.event_update_service.state')
+	def test_update_event_with_none_values(self, mock_state, mock_get_event):
+		"""Test that update_event handles None values correctly."""
+		# Setup
+		existing_event = Event(
+			event_key="TEST.EVENT.KEY",
+			nws_alert_id="alert-123",
+			event_type="FF",
+			start_date=datetime.now(timezone.utc),
+			description="Test event",
+			raw_vtec="/O.NEW.KFWD.FF.W.0015.240115T1000Z-240115T1100Z/",
+			episode_key=None,
+			hr_event_type=None,
+			expected_end_date=None,
+			actual_end_date=None,
+			property_damage=None,
+			crops_damage=None,
+			range_miles=None,
+			office=None
+		)
+		
+		mock_get_event.return_value = existing_event
+		mock_state.update_event = Mock()
+		
+		# Execute
+		result = EventUpdateService.update_event(existing_event)
+		
+		# Assertions - None values should be preserved
+		assert result.episode_key is None
+		assert result.hr_event_type is None
+		assert result.expected_end_date is None
+		assert result.actual_end_date is None
+		assert result.property_damage is None
+		assert result.crops_damage is None
+		assert result.range_miles is None
+		assert result.office is None

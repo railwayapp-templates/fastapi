@@ -87,6 +87,19 @@ class State:
 		return [event for event in all_events if event.is_active is True and not event.confirmed]
 	
 	@property
+	def confirmed_inactive_unprocessed_events(self) -> List[Event]:
+		"""
+		Getter for confirmed, inactive, and unprocessed events (for ETL).
+		"""
+		all_events = self.events
+		return [
+			event for event in all_events 
+			if event.confirmed is True 
+			and event.is_active is False 
+			and event.etl_processed is False
+		]
+	
+	@property
 	def polled_lsr_ids(self) -> List[str]:
 		"""
 		Getter for polled LSR IDs.

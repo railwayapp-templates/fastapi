@@ -99,7 +99,7 @@ The test suite includes **19 test files** covering all major components:
 2. **test_event_service.py** - Event service facade methods
 3. **test_event_create_service.py** - Event creation logic
 4. **test_event_update_service.py** - Event update logic
-5. **test_event_crud_service.py** - Event CRUD operations
+5. **test_event_read_service.py** - Event read operations
 6. **test_event_service_facade.py** - Service facade delegation
 7. **test_event_creation_processor.py** - Event creation processor (includes FWW filtering and HWW validation)
 8. **test_event_completion_service.py** - Event completion logic
