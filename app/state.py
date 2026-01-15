@@ -96,7 +96,7 @@ class State:
 			event for event in all_events 
 			if event.confirmed is True 
 			and event.is_active is False 
-			and event.etl_processed is False
+			#and event.etl_processed is False
 		]
 	
 	@property
