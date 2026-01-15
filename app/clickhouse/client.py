@@ -28,9 +28,11 @@ class ClickHouseClient:
 				port=settings.clickhouse_port,
 				username=settings.clickhouse_user,
 				password=settings.clickhouse_password,
-				database=settings.clickhouse_db
+				database=settings.clickhouse_db,
+				connect_timeout=settings.clickhouse_connect_timeout,
+				send_receive_timeout=settings.clickhouse_send_receive_timeout
 			)
-			logger.info(f"Connected to ClickHouse at {settings.clickhouse_host}:{settings.clickhouse_port}")
+			logger.info(f"Connected to ClickHouse at {settings.clickhouse_host}:{settings.clickhouse_port} with timeouts: connect={settings.clickhouse_connect_timeout}s, send_receive={settings.clickhouse_send_receive_timeout}s")
 		except Exception as e:
 			logger.error(f"Failed to connect to ClickHouse: {str(e)}")
 			raise

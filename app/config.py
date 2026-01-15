@@ -62,6 +62,8 @@ class Settings:
 	clickhouse_port: int = int(os.getenv("CH_PORT", "8123"))
 	clickhouse_user: str = os.getenv("CH_USER", "default")
 	clickhouse_password: str = os.getenv("CH_PASSWORD", "")
+	clickhouse_connect_timeout: int = int(os.getenv("CH_CONNECT_TIMEOUT", "30"))  # Default: 30 seconds
+	clickhouse_send_receive_timeout: int = int(os.getenv("CH_SEND_RECEIVE_TIMEOUT", "1200"))  # Default: 10 minutes
 	
 	@property
 	def clickhouse_db(self) -> str:
