@@ -7,7 +7,7 @@ from app.schemas.location import Location
 from app.shared_models.nws_poller_models import FilteredNWSAlert
 from app.state import state
 from app.utils.datetime_utils import parse_datetime_to_utc
-from app.services.event_crud_service import EventCRUDService
+from app.services.event_read_service import EventReadService
 from app.utils.vtec import extract_office_from_vtec
 import logging
 
@@ -37,7 +37,7 @@ class EventUpdateService:
 			NotFoundError: If event is not found
 		"""
 		try:
-			existing_event = EventCRUDService.get_event(updateable_alert.key)
+			existing_event = EventReadService.get_event(updateable_alert.key)
 			logger.info(f"Updating event {existing_event.event_key} from alert {updateable_alert.alert_id}")
 			
 			message_type = updateable_alert.message_type.upper()
@@ -136,6 +136,7 @@ class EventUpdateService:
 			description=f"{updateable_alert.headline or ''}\n\n{updateable_alert.description or ''}",
 			is_active=existing_event.is_active,  # Preserve is_active status
 			confirmed=confirmed,
+			etl_processed=existing_event.etl_processed,  # Preserve etl_processed status
 			raw_vtec=updateable_alert.raw_vtec,
 			office=office,
 			property_damage=existing_event.property_damage,  # Preserve these fields
@@ -185,6 +186,7 @@ class EventUpdateService:
 			description=new_description,
 			is_active=existing_event.is_active,
 			confirmed=confirmed,
+			etl_processed=existing_event.etl_processed,  # Preserve etl_processed status
 			raw_vtec=updateable_alert.raw_vtec,  # Update raw_vtec
 			office=office,
 			property_damage=existing_event.property_damage,
@@ -193,3 +195,95 @@ class EventUpdateService:
 			previous_ids=previous_ids
 		)
 
+	@staticmethod
+	def update_event(event: Event) -> Event:
+		"""
+		Update an existing event directly from an Event object.
+		
+		This method updates an event with the provided Event object, preserving
+		all fields and updating the updated_at timestamp.
+		
+		Args:
+			event: Event object with updated information
+		
+		Returns:
+			Updated Event object with updated_at timestamp set
+		
+		Raises:
+			NotFoundError: If event is not found
+		"""
+		# Verify event exists
+		EventReadService.get_event(event.event_key)
+		
+		# Update the event with current timestamp
+		updated_event = Event(
+			event_key=event.event_key,
+			nws_alert_id=event.nws_alert_id,
+			episode_key=event.episode_key,
+			event_type=event.event_type,
+			hr_event_type=event.hr_event_type,
+			locations=event.locations,
+			start_date=event.start_date,
+			expected_end_date=event.expected_end_date,
+			actual_end_date=event.actual_end_date,
+			updated_at=datetime.now(timezone.utc),
+			property_damage=event.property_damage,
+			crops_damage=event.crops_damage,
+			range_miles=event.range_miles,
+			description=event.description,
+			is_active=event.is_active,
+			confirmed=event.confirmed,
+			etl_processed=event.etl_processed,
+			raw_vtec=event.raw_vtec,
+			office=event.office,
+			previous_ids=event.previous_ids
+		)
+		
+		state.update_event(updated_event)
+		logger.info(f"Successfully updated event {updated_event.event_key} directly from Event object")
+		return updated_event
+
+	@staticmethod
+	def deactivate_event(event_key: str) -> Event:
+		"""
+		Deactivate an event by setting is_active=False and actual_end_date to current time.
+		
+		Args:
+			event_key: Key of event to deactivate
+		
+		Returns:
+			Deactivated Event object
+		
+		Raises:
+			NotFoundError: If event is not found
+		"""
+		existing_event = EventReadService.get_event(event_key)
+		
+		# Create updated event with is_active=False and actual_end_date set to now
+		deactivated_event = Event(
+			event_key=existing_event.event_key,
+			nws_alert_id=existing_event.nws_alert_id,
+			episode_key=existing_event.episode_key,
+			event_type=existing_event.event_type,
+			hr_event_type=existing_event.hr_event_type,
+			locations=existing_event.locations,
+			start_date=existing_event.start_date,
+			expected_end_date=existing_event.expected_end_date,
+			actual_end_date=datetime.now(timezone.utc),
+			updated_at=datetime.now(timezone.utc),
+			description=existing_event.description,
+			is_active=False,
+			confirmed=existing_event.confirmed,
+			etl_processed=existing_event.etl_processed,
+			raw_vtec=existing_event.raw_vtec,
+			office=existing_event.office,
+			property_damage=existing_event.property_damage,
+			crops_damage=existing_event.crops_damage,
+			range_miles=existing_event.range_miles,
+			previous_ids=existing_event.previous_ids
+		)
+		
+		# Update the event in state
+		state.update_event(deactivated_event)
+		logger.info(f"Deactivated event {event_key} with actual_end_date={deactivated_event.actual_end_date}")
+		return deactivated_event

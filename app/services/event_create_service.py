@@ -49,6 +49,7 @@ class EventCreateService:
 				description=f"{alert.headline or ''}\n\n{alert.description or ''}",
 				is_active=True,
 				confirmed=confirmed,
+				etl_processed=False,
 				raw_vtec=alert.raw_vtec,
 				office=office,
 				previous_ids=[]

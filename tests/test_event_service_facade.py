@@ -10,9 +10,9 @@ from app.schemas.event import Event
 class TestEventServiceFacade:
 	"""Test that EventService correctly delegates to underlying services."""
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_event')
+	@patch('app.services.event_read_service.EventReadService.get_event')
 	def test_get_event_delegates(self, mock_get_event):
-		"""Test that EventService.get_event delegates to EventCRUDService."""
+		"""Test that EventService.get_event delegates to EventReadService."""
 		mock_event = Mock(spec=Event)
 		mock_get_event.return_value = mock_event
 		
@@ -21,9 +21,9 @@ class TestEventServiceFacade:
 		mock_get_event.assert_called_once_with("test-key")
 		assert result == mock_event
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_events')
+	@patch('app.services.event_read_service.EventReadService.get_events')
 	def test_get_events_delegates_with_default(self, mock_get_events):
-		"""Test that EventService.get_events delegates to EventCRUDService with default active_only=True."""
+		"""Test that EventService.get_events delegates to EventReadService with default active_only=True."""
 		mock_events = [Mock(spec=Event), Mock(spec=Event)]
 		mock_get_events.return_value = mock_events
 		
@@ -32,9 +32,9 @@ class TestEventServiceFacade:
 		mock_get_events.assert_called_once_with(True)
 		assert result == mock_events
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_events')
+	@patch('app.services.event_read_service.EventReadService.get_events')
 	def test_get_events_delegates_with_explicit_active_only(self, mock_get_events):
-		"""Test that EventService.get_events delegates to EventCRUDService with explicit active_only parameter."""
+		"""Test that EventService.get_events delegates to EventReadService with explicit active_only parameter."""
 		mock_events = [Mock(spec=Event), Mock(spec=Event)]
 		mock_get_events.return_value = mock_events
 		
@@ -42,6 +42,17 @@ class TestEventServiceFacade:
 		
 		mock_get_events.assert_called_once_with(False)
 		assert result == mock_events
+	
+	@patch('app.services.event_update_service.EventUpdateService.deactivate_event')
+	def test_deactivate_event_delegates(self, mock_deactivate):
+		"""Test that EventService.deactivate_event delegates to EventUpdateService."""
+		mock_event = Mock(spec=Event)
+		mock_deactivate.return_value = mock_event
+		
+		result = EventService.deactivate_event("test-key")
+		
+		mock_deactivate.assert_called_once_with("test-key")
+		assert result == mock_event
 	
 	@patch('app.services.event_create_service.EventCreateService.create_event_from_alert')
 	def test_create_event_from_alert_delegates(self, mock_create):

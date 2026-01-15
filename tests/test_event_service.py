@@ -253,7 +253,7 @@ class TestUpdateEventFromAlert:
 			]
 		)
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_event')
+	@patch('app.services.event_read_service.EventReadService.get_event')
 	@patch('app.services.event_update_service.state')
 	def test_update_event_standard_update(self, mock_state, mock_get_event, existing_event, update_alert):
 		"""Test standard update (CON message type) - merges locations and updates fields."""
@@ -283,7 +283,7 @@ class TestUpdateEventFromAlert:
 		assert existing_event.nws_alert_id in result.previous_ids  # Old ID added
 		mock_state.update_event.assert_called_once_with(result)
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_event')
+	@patch('app.services.event_read_service.EventReadService.get_event')
 	@patch('app.services.event_update_service.state')
 	def test_update_event_cor_message_type(self, mock_state, mock_get_event, existing_event):
 		"""Test COR (Correction) message type - replaces entire event."""
@@ -338,7 +338,7 @@ class TestUpdateEventFromAlert:
 		assert result.actual_end_date == existing_event.actual_end_date  # Preserved
 		assert existing_event.nws_alert_id in result.previous_ids
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_event')
+	@patch('app.services.event_read_service.EventReadService.get_event')
 	@patch('app.services.event_update_service.state')
 	def test_update_event_upg_message_type(self, mock_state, mock_get_event, existing_event):
 		"""Test UPG (Update) message type - replaces entire event."""
@@ -388,7 +388,7 @@ class TestUpdateEventFromAlert:
 		assert "Upgraded Tornado Warning" in result.description
 		assert existing_event.nws_alert_id in result.previous_ids
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_event')
+	@patch('app.services.event_read_service.EventReadService.get_event')
 	@patch('app.services.event_update_service.state')
 	def test_update_event_can_message_type(self, mock_state, mock_get_event, existing_event):
 		"""Test CAN (Cancel) message type - returns None as it's handled by check_completed_events."""
@@ -426,7 +426,7 @@ class TestUpdateEventFromAlert:
 		# Should not update event (handled by check_completed_events instead)
 		mock_state.update_event.assert_not_called()
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_event')
+	@patch('app.services.event_read_service.EventReadService.get_event')
 	@patch('app.services.event_update_service.state')
 	def test_update_event_exp_message_type(self, mock_state, mock_get_event, existing_event):
 		"""Test EXP (Expired) message type - returns None as it's handled by check_completed_events."""
@@ -464,7 +464,7 @@ class TestUpdateEventFromAlert:
 		# Should not update event (handled by check_completed_events instead)
 		mock_state.update_event.assert_not_called()
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_event')
+	@patch('app.services.event_read_service.EventReadService.get_event')
 	@patch('app.services.event_update_service.state')
 	def test_update_event_merges_locations(self, mock_state, mock_get_event, existing_event):
 		"""Test that standard update merges locations without duplicates."""
@@ -514,7 +514,7 @@ class TestUpdateEventFromAlert:
 		assert "TXC113" in ugc_codes
 		assert "TXC215" in ugc_codes
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_event')
+	@patch('app.services.event_read_service.EventReadService.get_event')
 	@patch('app.services.event_update_service.state')
 	def test_update_event_no_duplicate_locations(self, mock_state, mock_get_event, existing_event):
 		"""Test that duplicate locations (same ugc_code) are not added."""
@@ -562,7 +562,7 @@ class TestUpdateEventFromAlert:
 		assert len(result.locations) == 1  # No duplicate added
 		assert result.locations[0].ugc_code == "TXC113"
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_event')
+	@patch('app.services.event_read_service.EventReadService.get_event')
 	@patch('app.services.event_update_service.state')
 	def test_update_event_not_found_error(self, mock_state, mock_get_event, update_alert):
 		"""Test that NotFoundError is raised when event doesn't exist."""
@@ -574,7 +574,7 @@ class TestUpdateEventFromAlert:
 		with pytest.raises(NotFoundError):
 			EventService.update_event_from_alert(update_alert)
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_event')
+	@patch('app.services.event_read_service.EventReadService.get_event')
 	@patch('app.services.event_update_service.state')
 	def test_update_event_tracks_previous_ids(self, mock_state, mock_get_event, existing_event, update_alert):
 		"""Test that previous alert IDs are tracked correctly."""
@@ -592,7 +592,7 @@ class TestUpdateEventFromAlert:
 		assert "old-alert-2" in result.previous_ids
 		assert existing_event.nws_alert_id in result.previous_ids
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_event')
+	@patch('app.services.event_read_service.EventReadService.get_event')
 	@patch('app.services.event_update_service.state')
 	def test_update_event_no_duplicate_previous_id(self, mock_state, mock_get_event, existing_event):
 		"""Test that current alert ID is not added to previous_ids if already there."""
@@ -629,7 +629,7 @@ class TestUpdateEventFromAlert:
 		# Assertions - should only have one instance of the old alert ID
 		assert result.previous_ids.count(existing_event.nws_alert_id) == 1
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_event')
+	@patch('app.services.event_read_service.EventReadService.get_event')
 	@patch('app.services.event_update_service.state')
 	def test_update_event_case_insensitive_message_type(self, mock_state, mock_get_event, existing_event):
 		"""Test that message type comparison is case-insensitive."""
@@ -666,7 +666,7 @@ class TestUpdateEventFromAlert:
 		# Assertions - CAN/EXP are now handled by check_completed_events, so this returns None
 		assert result is None
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_event')
+	@patch('app.services.event_read_service.EventReadService.get_event')
 	@patch('app.services.event_update_service.state')
 	def test_update_event_with_missing_expected_end(self, mock_state, mock_get_event, existing_event):
 		"""Test update when expected_end is None."""
@@ -1066,7 +1066,7 @@ class TestStateActiveEvents:
 class TestGetEvents:
 	"""Test cases for EventService.get_events filtering functionality."""
 	
-	@patch('app.services.event_crud_service.state')
+	@patch('app.services.event_read_service.state')
 	def test_get_events_returns_active_events_by_default(self, mock_state):
 		"""Test get_events returns only active events by default (active_only=True)."""
 		active_event = Event(
@@ -1098,7 +1098,7 @@ class TestGetEvents:
 		assert len(result) == 1
 		assert result[0].event_key == "event-1"
 	
-	@patch('app.services.event_crud_service.state')
+	@patch('app.services.event_read_service.state')
 	def test_get_events_with_active_only_true_returns_only_active_events(self, mock_state):
 		"""Test get_events with active_only=True returns only active events."""
 		active_event_1 = Event(
@@ -1143,7 +1143,7 @@ class TestGetEvents:
 		assert "active-2" in event_keys
 		assert "inactive-1" not in event_keys
 	
-	@patch('app.services.event_crud_service.state')
+	@patch('app.services.event_read_service.state')
 	def test_get_events_with_active_only_false_returns_all_events(self, mock_state):
 		"""Test get_events with active_only=False returns all events."""
 		active_event = Event(
@@ -1176,7 +1176,7 @@ class TestGetEvents:
 		assert "active-1" in event_keys
 		assert "inactive-1" in event_keys
 	
-	@patch('app.services.event_crud_service.state')
+	@patch('app.services.event_read_service.state')
 	def test_get_events_with_active_only_returns_empty_when_no_active_events(self, mock_state):
 		"""Test get_events with active_only=True returns empty list when no active events."""
 		inactive_event_1 = Event(
@@ -1334,7 +1334,7 @@ class TestConfirmedFunctionality:
 		result = EventService.create_event_from_alert(alert_mixed)
 		assert result.confirmed is True
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_event')
+	@patch('app.services.event_read_service.EventReadService.get_event')
 	@patch('app.services.event_update_service.state')
 	def test_update_event_with_observed_certainty_sets_confirmed_true(self, mock_state, mock_get_event):
 		"""Test that updating an event with certainty='Observed' sets confirmed=True."""
@@ -1378,7 +1378,7 @@ class TestConfirmedFunctionality:
 		
 		assert result.confirmed is True
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_event')
+	@patch('app.services.event_read_service.EventReadService.get_event')
 	@patch('app.services.event_update_service.state')
 	def test_update_event_preserves_confirmed_if_already_true(self, mock_state, mock_get_event):
 		"""Test that updating an event preserves confirmed=True if already set."""
@@ -1423,7 +1423,7 @@ class TestConfirmedFunctionality:
 		# Should preserve confirmed=True even though new alert is not observed
 		assert result.confirmed is True
 	
-	@patch('app.services.event_crud_service.EventCRUDService.get_event')
+	@patch('app.services.event_read_service.EventReadService.get_event')
 	@patch('app.services.event_update_service.state')
 	def test_replace_event_with_observed_certainty_sets_confirmed_true(self, mock_state, mock_get_event):
 		"""Test that replacing an event (COR/UPG) with certainty='Observed' sets confirmed=True."""

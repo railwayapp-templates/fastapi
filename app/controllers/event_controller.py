@@ -5,6 +5,7 @@ from app.schemas.event import Event
 from app.shared_models.nws_poller_models import FilteredNWSAlert
 from app.services.event_service import EventService
 from app.tasks.events_confirmation_task import events_confirmation_task
+from app.tasks.etl_task import etl_task
 from app.exceptions import handle_service_exceptions, NotFoundError
 import logging
 router = APIRouter(prefix="/events", tags=["events"])
@@ -38,18 +39,24 @@ async def create_event(alert: FilteredNWSAlert):
 
 @router.put("/{event_key}", response_model=Event)
 @handle_service_exceptions
-async def update_event(event_key: str, alert: FilteredNWSAlert):
+async def update_event(event_key: str, event: Event):
 	"""
 	Update an existing event.
+	
+	Args:
+		event_key: The event key from the URL path (must match event.event_key in body)
+		event: Event object with updated fields
+	
+	Returns:
+		Updated Event object
 	"""
-	if alert.message_type.upper() == "NEW":
-		message = f"Cannot update an existing event with a message type of {alert.message_type}"
+	# Verify the event_key in the path matches the event_key in the body
+	if event.event_key != event_key:
+		message = f"Event key in path ({event_key}) does not match event key in body ({event.event_key})"
 		logger.warning(message)
 		raise ConflictError(message)
-
-	updated_event = EventService.update_event_from_alert(alert)
-	if updated_event is None:
-		raise NotFoundError("Event", event_key)
+	
+	updated_event = EventService.update_event(event)
 	return updated_event
 
 @router.get("/{event_key}", response_model=Event)
@@ -138,3 +145,21 @@ async def deactivate_event(event_key: str):
 	deactivated_event = EventService.deactivate_event(event_key)
 	return deactivated_event
 
+@router.post("/etl", status_code=status.HTTP_202_ACCEPTED)
+@handle_service_exceptions
+async def trigger_etl():
+	"""
+	Trigger the ETL job to sync confirmed, inactive, unprocessed events to ClickHouse.
+	
+	This endpoint returns immediately and processes the ETL asynchronously in the background.
+	
+	Returns:
+		Dictionary with message and task ID
+	"""
+	task = etl_task.delay()
+	logger.info(f"Started ETL task with ID: {task.id}")
+	return {
+		"message": "ETL task started",
+		"task_id": task.id,
+		"status": "processing"
+	}

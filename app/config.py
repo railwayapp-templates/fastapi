@@ -56,6 +56,21 @@ class Settings:
 	
 	# Wind validation configuration
 	wind_speed_threshold_mph: int = int(os.getenv("WIND_SPEED_THRESHOLD_MPH", "65"))
+	
+	# ClickHouse configuration
+	clickhouse_host: str = os.getenv("CH_HOST", "localhost")
+	clickhouse_port: int = int(os.getenv("CH_PORT", "8123"))
+	clickhouse_user: str = os.getenv("CH_USER", "default")
+	clickhouse_password: str = os.getenv("CH_PASSWORD", "")
+	
+	@property
+	def clickhouse_db(self) -> str:
+		"""ClickHouse database name, with _dev suffix if IS_PR_ENV is true."""
+		base_db = os.getenv("CH_DB", "default")
+		is_pr_env = os.getenv("IS_PR_ENV", "false").lower() == "true"
+		if is_pr_env:
+			return f"{base_db}_dev"
+		return base_db
 
 	@property
 	def default_llm(self) -> LLM:

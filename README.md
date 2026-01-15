@@ -96,6 +96,14 @@ A FastAPI-based API for managing disaster events with AI agents powered by CrewA
    **Required for disaster polling agent**:
    - `GEMINI_API_KEY` - Your Gemini API key
    
+   **Required for ETL to ClickHouse**:
+   - `CH_HOST` - ClickHouse host (default: `localhost`)
+   - `CH_PORT` - ClickHouse port (default: `8123`)
+   - `CH_USER` - ClickHouse username (default: `default`)
+   - `CH_PASSWORD` - ClickHouse password (default: empty string)
+   - `CH_DB` - ClickHouse database name (default: `default`)
+   - `IS_PR_ENV` - If `true`, appends `_dev` to database name (default: `false`)
+   
    **Optional variables** (with defaults):
    - `REDIS_HOST` - Redis host (default: `localhost`)
    - `REDIS_PORT` - Redis port (default: `6379`)
@@ -133,6 +141,7 @@ A FastAPI-based API for managing disaster events with AI agents powered by CrewA
    - **Event Confirmation Task**: Every hour
    - **Wildfire Sync Task**: Daily at 8:30 AM EST / 9:30 AM EDT (13:30 UTC)
    - **Drought Sync Task**: Manual trigger only (via API endpoint)
+   - **ETL Task**: Every 6 hours (syncs confirmed, inactive, unprocessed events to ClickHouse)
    
    **Viewing Task Output:**
    - The task will log detailed output to the console with `INFO` level logging
@@ -146,6 +155,7 @@ A FastAPI-based API for managing disaster events with AI agents powered by CrewA
      celery -A app.celery_app call app.tasks.events_confirmation_task
      celery -A app.celery_app call app.tasks.wildfire_sync_task
      celery -A app.celery_app call app.tasks.drought_sync_task
+     celery -A app.celery_app call app.tasks.etl_task
      ```
    - To monitor task execution in real-time, use Flower (optional):
      ```bash
@@ -259,6 +269,7 @@ quantagentic_api/
 - `POST /events/{event_key}/deactivate` - Deactivate an event (sets `is_active=False` and `actual_end_date` to now)
 - `POST /events/confirm/{event_key}` - Confirm a specific event using LSR data
 - `POST /events/confirm` - Confirm all active and unconfirmed events (runs asynchronously)
+- `POST /events/etl` - Manually trigger ETL job to sync events to ClickHouse (runs asynchronously)
 
 ### Wildfires
 - `GET /wildfire` - List all wildfires (supports `?active_only=true/false`)
@@ -334,6 +345,35 @@ The drought sync task automatically:
 6. **Uses Tuesday date logic** - Accounts for data publication schedule (Thursdays)
 
 **Task**: `app.tasks.drought_sync_task` (runs on CeleryBeat schedule)
+
+### ETL Task (ClickHouse Sync)
+
+The ETL task automatically syncs confirmed, inactive, unprocessed events to ClickHouse:
+
+1. **Selects events** that meet all criteria:
+   - `confirmed=True` - Event has been confirmed via LSR data
+   - `is_active=False` - Event is no longer active
+   - `etl_processed=False` - Event has not been processed by ETL yet
+2. **Checks for idempotency** - Skips events that already exist in ClickHouse (prevents duplicates)
+3. **Batch inserts** events and their locations to ClickHouse
+4. **Marks events as processed** - Sets `etl_processed=True` after successful insertion
+5. **Error handling** - Retries up to 3 times with exponential backoff on failure
+6. **Comprehensive logging** - Logs all operations for monitoring and debugging
+
+**When events are selected for ETL:**
+- Events must be **confirmed** (have proof they occurred via LSR data)
+- Events must be **inactive** (no longer active, typically after `actual_end_date` is set)
+- Events must be **unprocessed** (`etl_processed=False`)
+
+This ensures only completed, verified events are archived to ClickHouse for long-term storage and analysis.
+
+**Task**: `app.tasks.etl_task` (runs every 6 hours via CeleryBeat schedule)
+
+**ClickHouse Tables:**
+- `disaster_events` - Main events table with all event metadata
+- `disaster_locations` - Locations table with geographic data for each event
+
+See `clickhouse_schema.sql` for table creation scripts.
 
 ## 🛠️ Development
 

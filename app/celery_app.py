@@ -45,6 +45,10 @@ celery_app.conf.beat_schedule = {
 		"task": "app.tasks.events_confirmation_task",
 		"schedule": schedule(run_every=timedelta(hours=1)),  # Every hour
 	},
+	"etl-task": {
+		"task": "app.tasks.etl_task",
+		"schedule": schedule(run_every=timedelta(hours=6)),  # Every 6 hours
+	},
 }
 
 celery_app.conf.timezone = "UTC"
@@ -55,4 +59,5 @@ import app.tasks.disaster_polling_task  # noqa: F401
 import app.tasks.drought_sync_task  # noqa: F401
 import app.tasks.wildfire_sync_task  # noqa: F401
 import app.tasks.events_confirmation_task  # noqa: F401
+import app.tasks.etl_task  # noqa: F401
 
