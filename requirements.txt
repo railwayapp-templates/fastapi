@@ -1,2 +1,5 @@
-fastapi==0.100.0
-hypercorn==0.14.4
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+anthropic==0.18.1
+pydantic==2.5.0
+python-dotenv==1.0.0
