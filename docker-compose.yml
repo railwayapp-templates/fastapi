@@ -1,0 +1,19 @@
+version: '3.9'
+
+services:
+  fastapi:
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    volumes:
+      - .:/code
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+  celery:
+    build: .
+    command: celery -A app.tasks worker --loglevel=info
+    depends_on:
+      - redis
+  redis:
+    image: redis:7
