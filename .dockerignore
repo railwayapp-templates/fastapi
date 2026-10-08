@@ -1,0 +1,15 @@
+.git
+.gitignore
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+*.md
+railway.json
+railway.toml
+nixpacks.toml
+procfile
+.aws-sam/
+samconfig.toml
+template.yaml

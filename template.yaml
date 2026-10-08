@@ -1,0 +1,86 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+# NOT for the CloudFormation console: this needs a built container image and
+# is deployed by .github/workflows/deploy-aws.yml. For the one-time console
+# setup, upload deploy/aws-bootstrap.yaml instead.
+Description: >-
+  APP TEMPLATE - deployed by GitHub Actions, do not upload in the console
+  (use deploy/aws-bootstrap.yaml for setup). Boyd proposal generator on Lambda.
+
+Parameters:
+  ActionApiKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: Value GPT Actions must send as X-API-Key. Leave empty to disable the check (not recommended).
+  PublicBaseUrl:
+    Type: String
+    Default: ""
+    Description: Optional custom domain for download links (e.g. https://api.example.com). Empty = use the Function URL.
+  FileRetentionDays:
+    Type: Number
+    Default: 7
+    MinValue: 1
+    Description: Days to keep generated workbooks in S3 before they are deleted.
+
+Resources:
+  ProposalsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireGeneratedProposals
+            Status: Enabled
+            Prefix: proposals/
+            ExpirationInDays: !Ref FileRetentionDays
+
+  ProposalFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      DockerContext: .
+      Dockerfile: Dockerfile
+    Properties:
+      PackageType: Image
+      Architectures: [x86_64]
+      MemorySize: 1024
+      # PDF download from OpenAI + parsing; Function URLs allow up to 15 min.
+      Timeout: 120
+      Environment:
+        Variables:
+          BOYD_S3_BUCKET: !Ref ProposalsBucket
+          BOYD_S3_PREFIX: proposals/
+          ACTION_API_KEY: !Ref ActionApiKey
+          PUBLIC_BASE_URL: !Ref PublicBaseUrl
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: [s3:PutObject, s3:GetObject]
+              Resource: !Sub "${ProposalsBucket.Arn}/proposals/*"
+            # Lets HeadObject return 404 (instead of 403) for missing files.
+            - Effect: Allow
+              Action: s3:ListBucket
+              Resource: !GetAtt ProposalsBucket.Arn
+      FunctionUrlConfig:
+        AuthType: NONE
+
+  ProposalFunctionLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${ProposalFunction}"
+      RetentionInDays: 30
+
+Outputs:
+  FunctionUrl:
+    Description: Public HTTPS endpoint (use as the GPT Action server URL)
+    Value: !GetAtt ProposalFunctionUrl.FunctionUrl
+  BucketName:
+    Value: !Ref ProposalsBucket

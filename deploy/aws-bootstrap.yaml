@@ -1,0 +1,218 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  SETUP TEMPLATE - upload this one in the CloudFormation console. One-time setup so GitHub Actions can deploy the Boyd proposal API with no
+  long-lived AWS keys. Create this stack in the CloudFormation console.
+
+Parameters:
+  GitHubRepo:
+    Type: String
+    Default: ericfinney/fastapi
+    Description: owner/repo allowed to deploy.
+  GitHubBranch:
+    Type: String
+    Default: main
+    Description: Only workflows running on this branch can assume the deploy role.
+  AppStackName:
+    Type: String
+    Default: boyd-proposals
+    AllowedPattern: "^[a-z][a-z0-9-]{2,30}$"
+    Description: Name of the application stack the workflow deploys. Must match the workflow's APP_STACK_NAME.
+  CreateOidcProvider:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: Set to false if this AWS account already has the token.actions.githubusercontent.com identity provider (IAM > Identity providers).
+
+Conditions:
+  MakeOidcProvider: !Equals [!Ref CreateOidcProvider, "true"]
+
+Resources:
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: MakeOidcProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList: [sts.amazonaws.com]
+
+  ImageRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Ref AppStackName
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {"rules":[{"rulePriority":1,"description":"Keep last 5 images",
+            "selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":5},
+            "action":{"type":"expire"}}]}
+      RepositoryPolicyText:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: LambdaImagePull
+            Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: [ecr:BatchGetImage, ecr:GetDownloadUrlForLayer]
+            Condition:
+              StringLike:
+                aws:sourceArn: !Sub "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${AppStackName}-*"
+
+  ArtifactBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireOldArtifacts
+            Status: Enabled
+            ExpirationInDays: 30
+
+  # Assumed by GitHub Actions. It can only drive CloudFormation for the app
+  # stack and push images; the actual resources are created by
+  # CloudFormationExecutionRole below.
+  GitHubDeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      # Deliberately not "${AppStackName}-*": the execution role manages IAM
+      # roles with that prefix and must not be able to modify these two.
+      RoleName: !Sub "github-deploy-${AppStackName}"
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub: !Sub "repo:${GitHubRepo}:ref:refs/heads/${GitHubBranch}"
+      Policies:
+        - PolicyName: deploy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: AppStack
+                Effect: Allow
+                Action:
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:DeleteChangeSet
+                  - cloudformation:DescribeStacks
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:GetTemplate
+                  - cloudformation:GetTemplateSummary
+                  - cloudformation:ListStackResources
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${AppStackName}/*"
+                  - !Sub "arn:${AWS::Partition}:cloudformation:${AWS::Region}:aws:transform/Serverless-2016-10-31"
+              - Sid: ReadThisBootstrapStack
+                Effect: Allow
+                Action: cloudformation:DescribeStacks
+                Resource: !Ref AWS::StackId
+              - Sid: TemplateChecks
+                Effect: Allow
+                Action: [cloudformation:ValidateTemplate, cloudformation:GetTemplateSummary]
+                Resource: "*"
+              - Sid: PassExecutionRole
+                Effect: Allow
+                Action: iam:PassRole
+                Resource: !GetAtt CloudFormationExecutionRole.Arn
+                Condition:
+                  StringEquals:
+                    iam:PassedToService: cloudformation.amazonaws.com
+              - Sid: Artifacts
+                Effect: Allow
+                Action: [s3:PutObject, s3:GetObject, s3:ListBucket, s3:GetBucketLocation]
+                Resource:
+                  - !GetAtt ArtifactBucket.Arn
+                  - !Sub "${ArtifactBucket.Arn}/*"
+              - Sid: EcrLogin
+                Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: "*"
+              - Sid: EcrPush
+                Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:BatchGetImage
+                  - ecr:CompleteLayerUpload
+                  - ecr:DescribeImages
+                  - ecr:DescribeRepositories
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:InitiateLayerUpload
+                  - ecr:PutImage
+                  - ecr:UploadLayerPart
+                Resource: !GetAtt ImageRepository.Arn
+
+  # Used by CloudFormation (not by GitHub) to create the app's resources.
+  # Every permission is limited to resources named after the app stack.
+  CloudFormationExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "cfn-exec-${AppStackName}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: cloudformation.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: app-resources
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # With a service role, CloudFormation runs the SAM transform
+              # (template.yaml's Transform line) as this role.
+              - Sid: SamTransform
+                Effect: Allow
+                Action: cloudformation:CreateChangeSet
+                Resource: !Sub "arn:${AWS::Partition}:cloudformation:${AWS::Region}:aws:transform/Serverless-2016-10-31"
+              - Sid: Lambda
+                Effect: Allow
+                Action: lambda:*
+                Resource: !Sub "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${AppStackName}-*"
+              - Sid: FunctionRole
+                Effect: Allow
+                Action: iam:*
+                Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${AppStackName}-*"
+              - Sid: AppBucket
+                Effect: Allow
+                Action: s3:*
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:s3:::${AppStackName}-*"
+                  - !Sub "arn:${AWS::Partition}:s3:::${AppStackName}-*/*"
+              - Sid: Logs
+                Effect: Allow
+                Action: logs:*
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AppStackName}-*"
+                  - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AppStackName}-*:*"
+              - Sid: LogsDescribe
+                Effect: Allow
+                Action: logs:DescribeLogGroups
+                Resource: "*"
+              - Sid: ImagePull
+                Effect: Allow
+                Action:
+                  - ecr:BatchGetImage
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:GetRepositoryPolicy
+                  - ecr:SetRepositoryPolicy
+                Resource: !GetAtt ImageRepository.Arn
+
+Outputs:
+  DeployRoleArn:
+    Description: Put this in the GitHub repository variable AWS_DEPLOY_ROLE_ARN
+    Value: !GetAtt GitHubDeployRole.Arn
+  CloudFormationExecutionRoleArn:
+    Value: !GetAtt CloudFormationExecutionRole.Arn
+  ImageRepositoryUri:
+    Value: !GetAtt ImageRepository.RepositoryUri
+  ArtifactBucketName:
+    Value: !Ref ArtifactBucket

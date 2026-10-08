@@ -1,0 +1,85 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write # OIDC: exchange a GitHub token for short-lived AWS credentials
+  contents: read
+
+concurrency:
+  group: deploy-aws
+  cancel-in-progress: false
+
+env:
+  APP_STACK_NAME: boyd-proposals
+  BOOTSTRAP_STACK_NAME: github-deploy-setup
+
+jobs:
+  deploy:
+    # Skipped (not failed) until the AWS setup in README.md is done.
+    if: vars.AWS_DEPLOY_ROLE_ARN != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - uses: aws-actions/setup-sam@v3
+        with:
+          use-installer: true
+
+      - name: Read setup stack outputs
+        run: |
+          out() {
+            aws cloudformation describe-stacks --stack-name "$BOOTSTRAP_STACK_NAME" \
+              --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text
+          }
+          {
+            echo "CFN_EXEC_ROLE_ARN=$(out CloudFormationExecutionRoleArn)"
+            echo "IMAGE_REPOSITORY=$(out ImageRepositoryUri)"
+            echo "ARTIFACT_BUCKET=$(out ArtifactBucketName)"
+          } >> "$GITHUB_ENV"
+
+      - name: Build
+        run: sam build
+
+      - name: Deploy
+        env:
+          ACTION_API_KEY: ${{ secrets.ACTION_API_KEY }}
+          PUBLIC_BASE_URL: ${{ vars.PUBLIC_BASE_URL }}
+        run: |
+          if [ -z "$ACTION_API_KEY" ]; then
+            echo "::error::Repository secret ACTION_API_KEY is not set."; exit 1
+          fi
+          params=("ActionApiKey=$ACTION_API_KEY")
+          # SAM rejects "Key=" with an empty value; omit to use the template default.
+          if [ -n "$PUBLIC_BASE_URL" ]; then params+=("PublicBaseUrl=$PUBLIC_BASE_URL"); fi
+          sam deploy \
+            --stack-name "$APP_STACK_NAME" \
+            --image-repository "$IMAGE_REPOSITORY" \
+            --s3-bucket "$ARTIFACT_BUCKET" \
+            --role-arn "$CFN_EXEC_ROLE_ARN" \
+            --capabilities CAPABILITY_IAM \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --parameter-overrides "${params[@]}"
+
+      - name: Smoke test
+        run: |
+          url=$(aws cloudformation describe-stacks --stack-name "$APP_STACK_NAME" \
+            --query "Stacks[0].Outputs[?OutputKey=='FunctionUrl'].OutputValue" --output text)
+          url="${url%/}"
+          health=$(curl -fsS --retry 5 --retry-delay 5 --retry-all-errors "$url/health")
+          echo "$health"
+          echo "$health" | grep -q '"storage":"s3"'
+          {
+            echo "### Deployed"
+            echo "API base URL: $url"
+          } >> "$GITHUB_STEP_SUMMARY"
